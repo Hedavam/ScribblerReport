@@ -6,6 +6,7 @@
 #include <QtWidgets>
 
 class QHBoxLayout;
+class QItemGroup;
 
 class MainWindow : public QMainWindow
 {
@@ -17,11 +18,25 @@ class MainWindow : public QMainWindow
     QWidget *mainWidget;
     QHBoxLayout *mainLayout;
     Scribbler *scribbler;
+
     QTabWidget *mainTable;
     int tabCounter;
+    QTableWidget *mouseEvtTable;
+
+    QList<MouseEvent> events;
+    QList<QList<MouseEvent>> captureList;
+
+    QGraphicsScene *tempScene;
+
+    QList<QLineF> lines;
+    QList<QRectF> dots;
+    QList<int> captureIndices;
 
     /* Menu Stuff */
     QString lastDir;
+
+    /* Helper funcs */
+    void createEventTable(QList<MouseEvent> _events);
 
 public:
     MainWindow(QWidget *parent = nullptr);
@@ -31,7 +46,7 @@ public slots:
     void lineSegmentSlot();
     void dotsSlot();
 
-    void showData();
+    void showData(QList<MouseEvent> _events);
 
     void openFileSlot();
     void saveFileSlot();

@@ -2,6 +2,7 @@
 #define SCRIBBLER_H
 
 #include <QGraphicsView>
+#include <QtWidgets/qgraphicsitem.h>
 
 class MouseEvent {
 public:
@@ -17,8 +18,6 @@ public:
 
     MouseEvent() {}; //empty constructor; could also use MouseEvent(const MouseEvent&)
     MouseEvent(int _action, QPointF _pos, quint64 _time);
-
-//    MouseEvent(const MOuseEvent&);
 
     friend QDataStream &operator<<(QDataStream &out, const MouseEvent &evt);
     friend QDataStream &operator>>(QDataStream &in, MouseEvent &evt);
@@ -38,20 +37,49 @@ private:
 
     QList<MouseEvent> events;
 
+    QList<QLineF> lines;
+    QList<QRectF> dots;
+
+    /* add scribble (tab) to item group for opacity setting */
+    QList<QGraphicsItemGroup*> scribbles;
+    QGraphicsItemGroup *scribble;
+    QList<int> captureIndices;
+
     /* boolean for line segments/dots only to be set by main window's menu */
     bool isLine;
+    bool isCapturing;
+
 
 public:
     void setLine() {
         isLine = true;
-    };
+    }
     void setDots() {
         isLine = false;
     }
+
     void resetScribbler() {
         events.clear();
         scene.clear();
+        lines.clear();
+        dots.clear();
     }
+
+    void opacityControl(int activeTab);
+
+    QList<QLineF> getLines() {
+        return lines;
+    }
+    QList<QRectF> getDots() {
+        return dots;
+    }
+
+    QList<int> getCaptureIndices() {
+        return captureIndices;
+    };
+
+
+    void drawAgain(QList<QLineF> _lines, QList<QRectF> _dots, QList<int> _captureIndices);
 
 protected:
     void mouseMoveEvent(QMouseEvent *evt) override;
@@ -65,6 +93,7 @@ signals:
 
 public slots:
     void startCaptureSlot();
+    /* when done capturing (based on menu), emit signal and clear */
     void endCaptureSlot();
 };
 

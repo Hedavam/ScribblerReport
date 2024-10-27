@@ -11,12 +11,10 @@ CONFIG += c++17
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
-    mypaint.cpp \
     scribbler.cpp
 
 HEADERS += \
     mainwindow.h \
-    mypaint.h \
     scribbler.h
 
 # Default rules for deployment.
