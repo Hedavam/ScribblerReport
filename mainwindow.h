@@ -21,6 +21,7 @@ class MainWindow : public QMainWindow
 
     QTabWidget *mainTable;
     int tabCounter;
+    int activeTab;
     QTableWidget *mouseEvtTable;
 
     QList<MouseEvent> events;
@@ -31,6 +32,8 @@ class MainWindow : public QMainWindow
     QList<QLineF> lines;
     QList<QRectF> dots;
     QList<int> captureIndices;
+
+    bool reOpenedFile;
 
     /* Menu Stuff */
     QString lastDir;
@@ -51,5 +54,7 @@ public slots:
     void openFileSlot();
     void saveFileSlot();
     void resetScribbleSlot();
+
+    void findActiveTab(int index);
 };
 #endif // MAINWINDOW_H

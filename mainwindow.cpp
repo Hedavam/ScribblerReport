@@ -5,9 +5,9 @@
 #include "scribbler.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), tabCounter(1){
+    : QMainWindow(parent), tabCounter(0), reOpenedFile(false){
 
-    /* UI Stuff */
+    /* UI Stuff + tabwidget connection */
 
     /* Main Layout for scribbler and tab */
     mainWidget = new QWidget();
@@ -63,13 +63,24 @@ MainWindow::MainWindow(QWidget *parent)
 
     /* Add keyboard shortcuts */
     startCaptureAct->setShortcut(Qt::CTRL | Qt::Key_3);
-    endCaptureAct->setShortcut(Qt::CTRL | Qt::Key_Escape);
+    endCaptureAct->setShortcut(Qt::CTRL | Qt::Key_4);
 
     /* Connect actions to appropriate slots */
     connect(startCaptureAct, &QAction::triggered, scribbler, &Scribbler::startCaptureSlot);
     connect(endCaptureAct, &QAction::triggered, scribbler, &Scribbler::endCaptureSlot);
 
+    /* to show data after receiving signal from scribbler that it's done capturing */
     connect(scribbler, &Scribbler::doneCapturingSignal, this, &MainWindow::showData);
+
+    /* opacity control */
+    if(!reOpenedFile) {
+        qDebug() << "should not be in here";
+        connect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl);
+    }
+
+    /* pre-step for higlighting */
+    connect(mainTable, &QTabWidget::currentChanged, this, &MainWindow::findActiveTab);
+
 
     /* Add file menu to the menu bar */
 
@@ -102,10 +113,18 @@ MainWindow::MainWindow(QWidget *parent)
     viewMenu->addAction(dotsAct);
 
     menuBar()->addMenu(viewMenu);
+
+    /* save last directory */
+    QSettings settings("FJS Systems", "Scribbler");
+    lastDir = settings.value("lastDir", "").toString();
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() {
+    QSettings settings("FJS Systems", "Scribbler");
+    settings.setValue("lastDir", lastDir);
+}
 
+/* set line/dot mode by invoking scribbler methods*/
 void MainWindow::lineSegmentSlot() {
     scribbler->setLine();
 }
@@ -114,57 +133,136 @@ void MainWindow::dotsSlot() {
     scribbler->setDots();
 }
 
-//TODO: Need the events to be sent thru from the signal
-void MainWindow::showData() {
+/* Events are sent thru from the signal */
+void MainWindow::showData(QList<MouseEvent> _events) {
+    /* increment tab counter, show main table w/ tabs */
+    ++tabCounter;
     mainTable->setHidden(false);
-    QTableWidget *mouseEvtTable = new QTableWidget();
 
+    /* initialize temp table with appropriate headers */
+    mouseEvtTable = new QTableWidget();
     mouseEvtTable->setHorizontalHeaderLabels(QStringList() << "Action" << "Position" << "Time");
 
-    //TODO: loop thru events to populate QTableWidget and add to tab
-    // int mouseEventSize = events.size();
-    // for (int i = 0; i < mouseEventSize; ++i) {
-
-    // }
-
+    /* create temp table, add it as tab */
+    createEventTable(_events);
     mainTable->addTab(mouseEvtTable, QString("capture %1").arg(tabCounter));
-    ++tabCounter;
-}
-
-//TODO: add error messages for permissions, etc.
-void MainWindow::openFileSlot() {
-    QString fName = QFileDialog::getOpenFileName(this, "Select file",  lastDir, "Image files (*.png *.jpeg *.jpg *.bmp)");
-    if (fName.isEmpty()) return;
-
-    QImage image(fName);
-    if (image.isNull()) return;
-
-    lastDir = QFileInfo(fName).absolutePath();
 }
 
 void MainWindow::saveFileSlot() {
+
     QString fName = QFileDialog::getSaveFileName(this, "Select file",  lastDir, "Image files (*.png *.jpeg *.jpg *.bmp)");
     if (fName.isEmpty()) return;
-
-    QImage image(fName);
-    if (image.isNull()) return;
 
     lastDir = QFileInfo(fName).absolutePath();
 
     QFile outFile(fName);
+
+    /* if file creation/opening fails, show error, return */
+    if (!outFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::information(this, "Cancelled", QString("Could not write to File \"%1\"").arg(fName));
+        return;
+    }
+
+    /* use Data Stream to send serialized outputs into file */
     QDataStream out(&outFile);
+    lines = scribbler->getLines();
+    dots =scribbler->getDots();
 
+    out << tabCounter << captureList << scribbler->getLines() << scribbler->getDots();
 
-    //TODO: loop thru mainTable's tabs:
+}
 
-    // out << mainTable-> tabText() << QTableWidgetItems << numBytes << encodingSize;
+void MainWindow::openFileSlot() {
+    reOpenedFile = true; //important! - it's so that we disable opacityControl when we reOpen file since I coudn't serialize the QGraphicsItemGroup*
+    disconnect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl); //temp fix
+
+    QList<QList<MouseEvent>> captureList;
+    QString fName = QFileDialog::getOpenFileName(this, "Open a saved drawing file",  lastDir, "Drawing files (*.png *.jpeg *.jpg *.bmp)");
+    if (fName.isEmpty()) return;
+
+    lastDir = QFileInfo(fName).absolutePath();
+
+    QFile inFile(fName);
+
+    if (!inFile.open(QIODevice::ReadOnly)) {
+        QMessageBox::information(this, "Cancelled", QString("Could not open File \"%1\"").arg(fName));
+        return;
+    }
+
+    /* Data stream operations again, but in reverse w/ in */
+    QDataStream in(&inFile);
+    in >> tabCounter >> captureList >> lines >> dots;
+
+    /* Reconstruct captured drawings & tabs */
+
+    /* drawings first */
+    scribbler->drawAgain(lines, dots);
+
+    /* tabs then */
+    tabCounter = 0;
+    int numCaptures = captureList.size();
+    for (int capture = 0; capture < numCaptures; capture++) {
+        showData(captureList[capture]);
+    }
 }
 
 void MainWindow::resetScribbleSlot() {
     scribbler->resetScribbler();
+    captureList.clear();
     mainTable->clear();
     mainTable->setHidden(true);
 }
 
+void MainWindow::createEventTable(QList<MouseEvent> _events) {
+    /* define table parameters */
+    events = _events;
+    captureList.append(events);
+
+    int nRows = events.size(), nCols = 5;
+
+    mouseEvtTable -> setRowCount(nRows);
+    mouseEvtTable -> setColumnCount(nCols);
+    mouseEvtTable->setHorizontalHeaderLabels(QStringList() << "Action" << "Position" << "Time" <<  "Distance" << "Speed");
 
 
+    /* fill in table */
+    for(int nRow = 0; nRow < nRows; nRow++) {
+        /* fill in 1st col w/ actions (press, release, move) */
+        QTableWidgetItem *actionItem = new QTableWidgetItem(QString::number(events[nRow].action));
+        mouseEvtTable->setItem(nRow, 0, actionItem);
+
+        /* fill in 2nd col w/ positions */
+        QString posStr = QString::number(events[nRow].pos.x()) + "," + QString::number(events[nRow].pos.y());
+        QTableWidgetItem *posItem = new QTableWidgetItem(posStr);
+        mouseEvtTable->setItem(nRow, 1, posItem);
+
+        /* fill in 3rd col w/ time */
+        QTableWidgetItem *timeItem = new QTableWidgetItem(QString::number(events[nRow].time));
+        mouseEvtTable->setItem(nRow, 2, timeItem);
+
+        /* can't calculate speed/dist until we get to 2nd point */
+        if (nRow > 0) {
+            /* fill in 4th col w/ distance between consecutivve points? */
+            MouseEvent prevPoint = events[nRow-1];
+            MouseEvent curPoint = events[nRow];
+
+            QLineF line(prevPoint.pos, curPoint.pos);
+            double dist = line.length();
+
+            QTableWidgetItem *distItem = new QTableWidgetItem(QString::number(dist));
+            mouseEvtTable->setItem(nRow, 3, distItem);
+
+            /* fill in 5th col w/ speed between consecutive points? */
+            double time = curPoint.time - prevPoint.time;
+            double speed = dist/time;
+            QTableWidgetItem *speedItem = new QTableWidgetItem(QString::number(speed));
+            mouseEvtTable->setItem(nRow, 4, speedItem);
+        }
+    }
+
+    connect(mouseEvtTable, &QTableWidget::itemSelectionChanged, scribbler, &Scribbler::highlightSections);
+}
+
+void MainWindow::findActiveTab(int index) {
+    scribbler->setActiveTab(index);
+}
