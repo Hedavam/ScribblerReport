@@ -4,22 +4,23 @@
 #include <QGraphicsView>
 #include <QtWidgets/qgraphicsitem.h>
 
-class MouseEvent {
+class MouseEvent
+{
 public:
-    enum {
-        Press,
-        Move,
-        Release
-    };
+    enum { Press, Move, Release };
 
     int action;
     QPointF pos;
     quint64 time;
-    QGraphicsLineItem* line;
-    QGraphicsEllipseItem* dot;
+    QGraphicsLineItem *line;
+    QGraphicsEllipseItem *dot;
 
     MouseEvent() {}; //empty constructor; could also use MouseEvent(const MouseEvent&)
-    MouseEvent(int _action, QPointF _pos, quint64 _time, QGraphicsLineItem* _line = nullptr, QGraphicsEllipseItem* _dot = nullptr); //default vals. in case they're not provided
+    MouseEvent(int _action,
+               QPointF _pos,
+               quint64 _time,
+               QGraphicsLineItem *_line = nullptr,
+               QGraphicsEllipseItem *_dot = nullptr); //default vals. in case they're not provided
 
     friend QDataStream &operator<<(QDataStream &out, const MouseEvent &evt);
     friend QDataStream &operator>>(QDataStream &in, MouseEvent &evt);
@@ -45,7 +46,7 @@ private:
     QList<QRectF> dots;
 
     /* keep track of all scribbles for opacity setting */
-    QList<QGraphicsItemGroup*> scribbles;
+    QList<QGraphicsItemGroup *> scribbles;
     QGraphicsItemGroup *scribble;
 
     /* for highligting, we want access to all our captured events */
@@ -60,36 +61,25 @@ private:
 
 public:
     /* some setters/getters/helpers - maybe they should not be implemented in header, but seems chill - ask */
-    void setLine() {
-        isLine = true;
-    }
-    void setDots() {
-        isLine = false;
-    }
+    void setLine() { isLine = true; }
+    void setDots() { isLine = false; }
 
-    void resetScribbler() {
+    void resetScribbler()
+    {
         events.clear();
         scene.clear();
         lines.clear();
         dots.clear();
     }
 
-    void setActiveTab(int tabIndex) {
-        activeTab = tabIndex;
-    }
-
+    void setActiveTab(int tabIndex) { activeTab = tabIndex; }
 
     void clearHighlights();
-    QList<QGraphicsLineItem*> highlightedLines;
-    QList<QGraphicsEllipseItem*> highlightedDots;
+    QList<QGraphicsLineItem *> highlightedLines;
+    QList<QGraphicsEllipseItem *> highlightedDots;
 
-    QList<QLineF> getLines() {
-        return lines;
-    }
-    QList<QRectF> getDots() {
-        return dots;
-    }
-
+    QList<QLineF> getLines() { return lines; }
+    QList<QRectF> getDots() { return dots; }
 
     void drawAgain(QList<QLineF> _lines, QList<QRectF> _dots);
 
@@ -98,8 +88,7 @@ protected:
     void mousePressEvent(QMouseEvent *evt) override;
     void mouseReleaseEvent(QMouseEvent *evt) override;
 
-
-//this throws it off, no matching constructor for initialization *
+    //this throws it off, no matching constructor for initialization *
 signals:
     void doneCapturingSignal(QList<MouseEvent> _events);
 

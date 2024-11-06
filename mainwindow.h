@@ -1,9 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "scribbler.h"
 #include <QMainWindow>
 #include <QtWidgets>
+#include "scribbler.h"
 
 class QHBoxLayout;
 class QItemGroup;

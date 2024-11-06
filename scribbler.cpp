@@ -2,20 +2,30 @@
 
 #include <QtWidgets>
 
-MouseEvent::MouseEvent(int _action, QPointF _pos, quint64 _time, QGraphicsLineItem* _line, QGraphicsEllipseItem* _dot)
-    :action(_action),pos(_pos),time(_time), line(_line), dot(_dot) { }
+MouseEvent::MouseEvent(
+    int _action, QPointF _pos, quint64 _time, QGraphicsLineItem *_line, QGraphicsEllipseItem *_dot)
+    : action(_action)
+    , pos(_pos)
+    , time(_time)
+    , line(_line)
+    , dot(_dot)
+{}
 
-QDataStream &operator<<(QDataStream &out, const MouseEvent &evt) {
+QDataStream &operator<<(QDataStream &out, const MouseEvent &evt)
+{
     return out << evt.action << evt.pos << evt.time;
 }
 
-QDataStream &operator>>(QDataStream &in, MouseEvent &evt) {
+QDataStream &operator>>(QDataStream &in, MouseEvent &evt)
+{
     return in >> evt.action >> evt.pos >> evt.time;
 }
 
 //========== Scribbler
 Scribbler::Scribbler()
-    :lineWidth(4.0), isLine(true) {
+    : lineWidth(4.0)
+    , isLine(true)
+{
     setScene(&scene);
     setSceneRect(QRectF(0.0, 0.0, 800.0, 600.0));
     setMaximumSize(800, 600);
@@ -28,16 +38,16 @@ Scribbler::Scribbler()
     scribble = new QGraphicsItemGroup();
 }
 
-
-void Scribbler::mousePressEvent(QMouseEvent *evt) {
+void Scribbler::mousePressEvent(QMouseEvent *evt)
+{
     QGraphicsView::mousePressEvent(evt); //call base class's method so default behavior still occurs
-
 
     /* view coords -> scene coords */
     QPointF p = mapToScene(evt->pos());
     lastPoint = p;
 
-    QRectF initDot = QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth));
+    QRectF initDot = QRectF(p - QPointF(0.5 * lineWidth, 0.5 * lineWidth),
+                            QSizeF(lineWidth, lineWidth));
 
     QGraphicsEllipseItem *ellipseItem = scene.addEllipse(initDot, Qt::NoPen, Qt::black);
 
@@ -48,22 +58,25 @@ void Scribbler::mousePressEvent(QMouseEvent *evt) {
 
     /* add scribble to group, want all scribbles! cuz we wanna be able to make non-captured ones opaque too */
     scribble->addToGroup(ellipseItem);
-    scene.addItem(scribble); //pretty sure this causes duplicate additions to the graphicscene, but save coding lines - ask//
+    scene.addItem(
+        scribble); //pretty sure this causes duplicate additions to the graphicscene, but save coding lines - ask//
 
     events << MouseEvent(MouseEvent::Press, p, evt->timestamp(), nullptr, ellipseItem);
 }
 
-void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
+void Scribbler::mouseMoveEvent(QMouseEvent *evt)
+{
     QGraphicsView::mouseMoveEvent(evt);
 
     QPointF p = mapToScene(evt->pos());
 
-    if(isLine) {
+    if (isLine) {
         QLineF line = QLineF(lastPoint, p);
 
-        QGraphicsLineItem *lineItem = scene.addLine(line, QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+        QGraphicsLineItem *lineItem
+            = scene.addLine(line, QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
 
-        if(isCapturing) {
+        if (isCapturing) {
             lines.append(line);
         }
 
@@ -77,7 +90,8 @@ void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
     }
 
     else {
-        QRectF dot = QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth));
+        QRectF dot = QRectF(p - QPointF(0.5 * lineWidth, 0.5 * lineWidth),
+                            QSizeF(lineWidth, lineWidth));
 
         QGraphicsEllipseItem *ellipseItem = scene.addEllipse(dot, Qt::NoPen, Qt::black);
 
@@ -92,15 +106,16 @@ void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
     }
 }
 
-void Scribbler::mouseReleaseEvent(QMouseEvent *evt) {
+void Scribbler::mouseReleaseEvent(QMouseEvent *evt)
+{
     QGraphicsView::mouseReleaseEvent(evt);
 
     QPointF p = mapToScene(evt->pos());
     events << MouseEvent(MouseEvent::Release, p, evt->timestamp());
 }
 
-
-void Scribbler::startCaptureSlot() {
+void Scribbler::startCaptureSlot()
+{
     /* clear, so we start capturing on empty slate */
     isCapturing = true;
     events.clear();
@@ -108,13 +123,12 @@ void Scribbler::startCaptureSlot() {
     /* add scribble to scribbles, start fresh to look for new ones */
     scribbles.append(scribble);
     scribble = new QGraphicsItemGroup();
-
 }
 
 /* when done capturing (based on menu), emit signal, clear; also, add item to scene, and add scribble to itemgroup */
-void Scribbler::endCaptureSlot() {
-
-    if(!isCapturing) {
+void Scribbler::endCaptureSlot()
+{
+    if (!isCapturing) {
         QMessageBox::information(this, "Cancelled", QString("No Capture has been Started"));
         return;
     }
@@ -131,7 +145,8 @@ void Scribbler::endCaptureSlot() {
     isCapturing = false;
 }
 
-void Scribbler::opacityControl(int activeTab){
+void Scribbler::opacityControl(int activeTab)
+{
     qDebug() << "im the culprit";
     /* for all item groups, set opacity to 0.25 */
     for (QGraphicsItem *scribble : scribbles) {
@@ -142,11 +157,13 @@ void Scribbler::opacityControl(int activeTab){
     scribbles[activeTab * 2 + 1]->setOpacity(1.0);
 }
 
-void Scribbler::highlightSections() {
+void Scribbler::highlightSections()
+{
     clearHighlights();
 
-    QTableWidget *activeTable = qobject_cast<QTableWidget*>(sender()); //online help: https://stackoverflow.com/questions/4046839/how-to-get-sender-widget-with-a-signal-slot-mechanism
-    QList<QTableWidgetItem*> selectedItems = activeTable->selectedItems();
+    QTableWidget *activeTable = qobject_cast<QTableWidget *>(
+        sender()); //online help: https://stackoverflow.com/questions/4046839/how-to-get-sender-widget-with-a-signal-slot-mechanism
+    QList<QTableWidgetItem *> selectedItems = activeTable->selectedItems();
 
     /* color lines/dots corresponding to selected events; keep track of graphicItems that we highlight */
     foreach (QTableWidgetItem *item, selectedItems) {
@@ -156,7 +173,7 @@ void Scribbler::highlightSections() {
         QGraphicsEllipseItem *dotItem = allEvents[activeTab].second[row].dot;
 
         if (lineItem) {
-            lineItem->setPen(QPen(Qt::green, lineWidth/2, Qt::SolidLine, Qt::FlatCap));
+            lineItem->setPen(QPen(Qt::green, lineWidth / 2, Qt::SolidLine, Qt::FlatCap));
             highlightedLines.append(lineItem);
         }
 
@@ -167,7 +184,8 @@ void Scribbler::highlightSections() {
     }
 }
 
-void Scribbler::clearHighlights() {
+void Scribbler::clearHighlights()
+{
     /* color highlighted lines/dots black - esssentially clearing the highlight; clear highlighted graphicItems */
     for (QGraphicsLineItem *lineItem : highlightedLines) {
         lineItem->setPen(QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
@@ -181,7 +199,8 @@ void Scribbler::clearHighlights() {
 }
 
 /* using our de-serialzed lines,dots -> draw them again to get the user back to where they were after saving file */
-void Scribbler::drawAgain(QList<QLineF> _lines, QList<QRectF> _dots) {
+void Scribbler::drawAgain(QList<QLineF> _lines, QList<QRectF> _dots)
+{
     int linesSize = _lines.size();
     int dotsSize = _dots.size();
 
