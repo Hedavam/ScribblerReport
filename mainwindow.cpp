@@ -72,11 +72,11 @@ MainWindow::MainWindow(QWidget *parent)
     /* to show data after receiving signal from scribbler that it's done capturing */
     connect(scribbler, &Scribbler::doneCapturingSignal, this, &MainWindow::showData);
 
-    /* opacity control */
-    if(!reOpenedFile) {
-        qDebug() << "should not be in here";
-        connect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl);
-    }
+    /* opacity control */ //!!TODO: could be problem area!!!
+    // if(!reOpenedFile) {
+    //     qDebug() << "should not be in here";
+    //     connect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl);
+    // }
 
     /* pre-step for higlighting */
     connect(mainTable, &QTabWidget::currentChanged, this, &MainWindow::findActiveTab);

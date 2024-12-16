@@ -68,10 +68,14 @@ public:
     }
 
     void resetScribbler() {
+        allEvents.clear();
+        highlightedLines.clear();
+        highlightedDots.clear();
         events.clear();
         scene.clear();
         lines.clear();
         dots.clear();
+
     }
 
     void setActiveTab(int tabIndex) {
