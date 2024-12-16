@@ -143,10 +143,14 @@ void Scribbler::opacityControl(int activeTab){
 }
 
 void Scribbler::highlightSections() {
+    qDebug() << "pretty sure allEvents is empty - serialize it/deserialize it";
+
     clearHighlights();
 
     QTableWidget *activeTable = qobject_cast<QTableWidget*>(sender()); //online help: https://stackoverflow.com/questions/4046839/how-to-get-sender-widget-with-a-signal-slot-mechanism
     QList<QTableWidgetItem*> selectedItems = activeTable->selectedItems();
+
+    qDebug() << selectedItems << "SELECTED ITEMS";
 
     /* color lines/dots corresponding to selected events; keep track of graphicItems that we highlight */
     foreach (QTableWidgetItem *item, selectedItems) {
