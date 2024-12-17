@@ -54,11 +54,12 @@ private:
     int captureCount;
     int activeTab;
 
-    /* boolean for line segments/dots only to be set by main window's menu */
-    bool isLine;
     bool isCapturing;
 
 public:
+    /* boolean for line segments/dots only to be set by main window's menu */
+    bool isLine;
+
     /* some setters/getters/helpers - maybe they should not be implemented in header, but seems chill - ask */
     void setLine() {
         isLine = true;
@@ -68,14 +69,19 @@ public:
     }
 
     void resetScribbler() {
-        allEvents.clear();
+        scribbles.clear();
+
         highlightedLines.clear();
         highlightedDots.clear();
+        allEvents.clear();
         events.clear();
+
         scene.clear();
+
         lines.clear();
         dots.clear();
 
+        scribble = new QGraphicsItemGroup(); //crucial! remember every time fire up again we need a scribble group running
     }
 
     void setActiveTab(int tabIndex) {
@@ -95,7 +101,7 @@ public:
     }
 
 
-    void drawAgain(QList<QLineF> _lines, QList<QRectF> _dots);
+    void drawAgain(QList<QLineF> _lines, QList<QRectF> _dots, bool _isLine);
 
 protected:
     void mouseMoveEvent(QMouseEvent *evt) override;
@@ -114,6 +120,9 @@ public slots:
 
     void opacityControl(int activeTab);
     void highlightSections();
+    void showDots();
+    void showLines();
+    // void allLines();
 };
 
 #endif // SCRIBBLER_H

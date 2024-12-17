@@ -5,7 +5,7 @@
 #include "scribbler.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), tabCounter(0), reOpenedFile(false){
+    : QMainWindow(parent), tabCounter(0), isFirstOpened(true){
 
     /* UI Stuff + tabwidget connection */
 
@@ -72,11 +72,10 @@ MainWindow::MainWindow(QWidget *parent)
     /* to show data after receiving signal from scribbler that it's done capturing */
     connect(scribbler, &Scribbler::doneCapturingSignal, this, &MainWindow::showData);
 
-    /* opacity control */ //!!TODO: could be problem area!!!
-    // if(!reOpenedFile) {
-    //     qDebug() << "should not be in here";
-    //     connect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl);
-    // }
+    /* opacity control */
+    if(isFirstOpened) {
+        connect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl);
+    }
 
     /* pre-step for higlighting */
     connect(mainTable, &QTabWidget::currentChanged, this, &MainWindow::findActiveTab);
@@ -127,10 +126,12 @@ MainWindow::~MainWindow() {
 /* set line/dot mode by invoking scribbler methods*/
 void MainWindow::lineSegmentSlot() {
     scribbler->setLine();
+    scribbler->showLines();
 }
 
 void MainWindow::dotsSlot() {
     scribbler->setDots();
+    scribbler->showDots();
 }
 
 /* Events are sent thru from the signal */
@@ -168,13 +169,13 @@ void MainWindow::saveFileSlot() {
     lines = scribbler->getLines();
     dots =scribbler->getDots();
 
-    out << tabCounter << captureList << scribbler->getLines() << scribbler->getDots();
+    out << tabCounter << captureList << scribbler->getLines() << scribbler->getDots() << scribbler->isLine;
 
 }
 
 void MainWindow::openFileSlot() {
-    reOpenedFile = true; //important! - it's so that we disable opacityControl when we reOpen file since I coudn't serialize the QGraphicsItemGroup*
-    disconnect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl); //temp fix
+    isFirstOpened = false; //important! - it's so that we disable opacityControl when we reOpen file since serializing QGraphicsItemGroup* could not be implemented
+    disconnect(mainTable, &QTabWidget::currentChanged, scribbler, &Scribbler::opacityControl); //opacity control will not be available on re-opened files
 
     QList<QList<MouseEvent>> captureList;
     QString fName = QFileDialog::getOpenFileName(this, "Open a saved drawing file",  lastDir, "Drawing files (*.png *.jpeg *.jpg *.bmp)");
@@ -191,12 +192,12 @@ void MainWindow::openFileSlot() {
 
     /* Data stream operations again, but in reverse w/ in */
     QDataStream in(&inFile);
-    in >> tabCounter >> captureList >> lines >> dots;
+    in >> tabCounter >> captureList >> lines >> dots >> isLine;
 
     /* Reconstruct captured drawings & tabs */
 
     /* drawings first */
-    scribbler->drawAgain(lines, dots);
+    scribbler->drawAgain(lines, dots, isLine);
 
     /* tabs then */
     tabCounter = 0;
@@ -211,6 +212,7 @@ void MainWindow::resetScribbleSlot() {
     captureList.clear();
     mainTable->clear();
     mainTable->setHidden(true);
+    tabCounter = 0;
 }
 
 void MainWindow::createEventTable(QList<MouseEvent> _events) {
@@ -226,19 +228,21 @@ void MainWindow::createEventTable(QList<MouseEvent> _events) {
 
 
     /* fill in table */
+    int cols[] = {0, 1, 2, 3, 4};
+
     for(int nRow = 0; nRow < nRows; nRow++) {
         /* fill in 1st col w/ actions (press, release, move) */
         QTableWidgetItem *actionItem = new QTableWidgetItem(QString::number(events[nRow].action));
-        mouseEvtTable->setItem(nRow, 0, actionItem);
+        mouseEvtTable->setItem(nRow, cols[0], actionItem);
 
         /* fill in 2nd col w/ positions */
         QString posStr = QString::number(events[nRow].pos.x()) + "," + QString::number(events[nRow].pos.y());
         QTableWidgetItem *posItem = new QTableWidgetItem(posStr);
-        mouseEvtTable->setItem(nRow, 1, posItem);
+        mouseEvtTable->setItem(nRow, cols[1], posItem);
 
         /* fill in 3rd col w/ time */
         QTableWidgetItem *timeItem = new QTableWidgetItem(QString::number(events[nRow].time));
-        mouseEvtTable->setItem(nRow, 2, timeItem);
+        mouseEvtTable->setItem(nRow, cols[2], timeItem);
 
         /* can't calculate speed/dist until we get to 2nd point */
         if (nRow > 0) {
@@ -250,13 +254,13 @@ void MainWindow::createEventTable(QList<MouseEvent> _events) {
             double dist = line.length();
 
             QTableWidgetItem *distItem = new QTableWidgetItem(QString::number(dist));
-            mouseEvtTable->setItem(nRow, 3, distItem);
+            mouseEvtTable->setItem(nRow, cols[3], distItem);
 
             /* fill in 5th col w/ speed between consecutive points? */
             double time = curPoint.time - prevPoint.time;
             double speed = dist/time;
             QTableWidgetItem *speedItem = new QTableWidgetItem(QString::number(speed));
-            mouseEvtTable->setItem(nRow, 4, speedItem);
+            mouseEvtTable->setItem(nRow, cols[4], speedItem);
         }
     }
 

@@ -39,16 +39,18 @@ void Scribbler::mousePressEvent(QMouseEvent *evt) {
 
     QRectF initDot = QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth));
 
-    QGraphicsEllipseItem *ellipseItem = scene.addEllipse(initDot, Qt::NoPen, Qt::black);
+    QGraphicsEllipseItem *ellipseItem = new QGraphicsEllipseItem(initDot); //only add item to group, not to scene!
+    ellipseItem->setPen(Qt::NoPen);
+    ellipseItem->setBrush(Qt::black);
+
+    /* add scribble to group, want all scribbles! cuz we wanna be able to make non-captured ones opaque too */
+    scribble->addToGroup(ellipseItem);
+    scene.addItem(scribble); //only needs to be added once
 
     /* add init dot to dot list */
     if (isCapturing) {
         dots.append(initDot);
     }
-
-    /* add scribble to group, want all scribbles! cuz we wanna be able to make non-captured ones opaque too */
-    scribble->addToGroup(ellipseItem);
-    scene.addItem(scribble); //pretty sure this causes duplicate additions to the graphicscene, but save coding lines - ask//
 
     events << MouseEvent(MouseEvent::Press, p, evt->timestamp(), nullptr, ellipseItem);
 }
@@ -58,38 +60,46 @@ void Scribbler::mouseMoveEvent(QMouseEvent *evt) {
 
     QPointF p = mapToScene(evt->pos());
 
+
+    QLineF line = QLineF(lastPoint, p);
+
+    QGraphicsLineItem *lineItem = new QGraphicsLineItem(line);
+    lineItem->setPen(QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+    scribble->addToGroup(lineItem);
+
+    if(!isLine) {
+        lineItem->setVisible(false);
+    }
+    if(isCapturing) {
+        lines.append(line);
+    }
+
+    /* start new line where old one ended */
+    lastPoint = p;
+    events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), lineItem, nullptr);
+
+
+    QRectF dot = QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth));
+
+    QGraphicsEllipseItem *ellipseItem = new QGraphicsEllipseItem(dot); //only add item to group, not to scene!
+    ellipseItem->setPen(Qt::NoPen);
+    ellipseItem->setBrush(Qt::black);
+
+    /* add scribble to group, want all scribbles! cuz we wanna be able to make non-captured ones opaque too */
+    scribble->addToGroup(ellipseItem);
+
+    /* add group with line,dot to scene! */
+    //scene.addItem(scribble);
+
     if(isLine) {
-        QLineF line = QLineF(lastPoint, p);
-
-        QGraphicsLineItem *lineItem = scene.addLine(line, QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
-
-        if(isCapturing) {
-            lines.append(line);
-        }
-
-        scribble->addToGroup(lineItem);
-        scene.addItem(scribble);
-
-        /* start new line where old one ended */
-        lastPoint = p;
-        events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), lineItem, nullptr);
-
+        ellipseItem->setVisible(false);
+    }
+    if (isCapturing) {
+        dots.append(dot);
     }
 
-    else {
-        QRectF dot = QRectF(p - QPointF(0.5*lineWidth, 0.5*lineWidth), QSizeF(lineWidth, lineWidth));
-
-        QGraphicsEllipseItem *ellipseItem = scene.addEllipse(dot, Qt::NoPen, Qt::black);
-
-        if (isCapturing) {
-            dots.append(dot);
-        }
-        scribble->addToGroup(ellipseItem);
-        scene.addItem(scribble);
-
-        lastPoint = p;
-        events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), nullptr, ellipseItem);
-    }
+    lastPoint = p;
+    events << MouseEvent(MouseEvent::Move, p, evt->timestamp(), nullptr, ellipseItem);
 }
 
 void Scribbler::mouseReleaseEvent(QMouseEvent *evt) {
@@ -131,8 +141,14 @@ void Scribbler::endCaptureSlot() {
     isCapturing = false;
 }
 
+//TODO: this breaks a lotta things ngl!!!! fix it!!
 void Scribbler::opacityControl(int activeTab){
-    qDebug() << "im the culprit";
+
+    //crucial! - after resetting this function is invoked again, but we should exit early because there's no scribbles to parse!!
+    if (scribbles.isEmpty()) {
+        return;
+    }
+
     /* for all item groups, set opacity to 0.25 */
     for (QGraphicsItem *scribble : scribbles) {
         scribble->setOpacity(0.25);
@@ -143,14 +159,10 @@ void Scribbler::opacityControl(int activeTab){
 }
 
 void Scribbler::highlightSections() {
-    qDebug() << "pretty sure allEvents is empty - serialize it/deserialize it";
-
     clearHighlights();
 
     QTableWidget *activeTable = qobject_cast<QTableWidget*>(sender()); //online help: https://stackoverflow.com/questions/4046839/how-to-get-sender-widget-with-a-signal-slot-mechanism
     QList<QTableWidgetItem*> selectedItems = activeTable->selectedItems();
-
-    qDebug() << selectedItems << "SELECTED ITEMS";
 
     /* color lines/dots corresponding to selected events; keep track of graphicItems that we highlight */
     foreach (QTableWidgetItem *item, selectedItems) {
@@ -184,15 +196,47 @@ void Scribbler::clearHighlights() {
     highlightedDots.clear();
 }
 
+
+/* When menu is clicked we want to change all drawings to either lines/dots */
+
+/* change all lines to dots - just change what's shown */
+void Scribbler::showDots() {
+    foreach(QGraphicsItem* item, scene.items()) {
+        if (item->type() == QGraphicsLineItem::Type) {
+            item->setVisible(false);
+        } else {
+            item->setVisible(true);
+        }
+    }
+}
+
+/* change all dots to lines - just change what's shown*/
+void Scribbler::showLines() {
+    foreach(QGraphicsItem* item, scene.items()) {
+        if (item->type() == QGraphicsEllipseItem::Type) {
+            item->setVisible(false);
+        } else {
+            item->setVisible(true);
+        }
+    }
+}
+
+
 /* using our de-serialzed lines,dots -> draw them again to get the user back to where they were after saving file */
-void Scribbler::drawAgain(QList<QLineF> _lines, QList<QRectF> _dots) {
+void Scribbler::drawAgain(QList<QLineF> _lines, QList<QRectF> _dots, bool _isLine) {
     int linesSize = _lines.size();
     int dotsSize = _dots.size();
 
     for (int line = 0; line < linesSize; line++) {
-        scene.addLine(_lines[line], QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+        QGraphicsLineItem *lineItem  = scene.addLine(_lines[line], QPen(Qt::black, lineWidth, Qt::SolidLine, Qt::FlatCap));
+        if(!_isLine) {
+            lineItem->setVisible(false);
+        }
     }
     for (int dot = 0; dot < dotsSize; dot++) {
-        scene.addEllipse(_dots[dot], Qt::NoPen, Qt::black);
+        QGraphicsEllipseItem *ellipseItem = scene.addEllipse(_dots[dot], Qt::NoPen, Qt::black);
+        if(_isLine) {
+            ellipseItem->setVisible(false);
+        }
     }
 }
