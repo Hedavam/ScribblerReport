@@ -33,7 +33,11 @@ class MainWindow : public QMainWindow
     QList<QRectF> dots;
     QList<int> captureIndices;
 
-    bool reOpenedFile;
+    bool isFirstOpened;
+    bool isLine;
+
+    /* for highligting, we want access to all our captured events */
+    QList<QPair<int, QList<MouseEvent>>> allEvents;
 
     /* Menu Stuff */
     QString lastDir;
